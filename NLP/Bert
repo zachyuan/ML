@@ -45,7 +45,26 @@
   输出是特征向量，通过在描述文本上接一层激活函数为softmax的全连接来获得输出文本的条件概率，全连接的输出节点个数是语料中Token的个数。
   命名实体识别:
   CoNLL-2003 NER：判断一个句子中的单词是不是Person，Organization，Location，Miscellaneous或者other（无命名实体）。微调CoNLL-2003 NER时将整个句子作为输入，在每个时间片输出一个概率，并通过softmax得到这个Token的实体类别。
-  
+-----------
+1.BERT模型
+BERT的全称是Bidirectional Encoder Representation from Transformers，即双向Transformer的Encoder，
+因为decoder是不能获要预测的信息的。模型的主要创新点都在pre-train方法上，即用了Masked LM和Next Sentence Prediction两种方法分别捕捉词语和句子级别的representation。
+2.模型结构GPT EMLO Bert
+对比OpenAI GPT(Generative pre-trained transformer)，BERT是双向的Transformer block连接；就像单向rnn和双向rnn的区别，直觉上来讲效果会好一些。
+对比ELMo，虽然都是“双向”，但目标函数其实是不同的。ELMo是分别作为目标函数，独立训练处两个representation然后拼接，而BERT则是以整个作为目标函数训练LM。
+2.1 Embedding
+ Token Embeddings是词向量，第一个单词是CLS标志，可以用于之后的分类任务
+ Segment Embeddings用来区别两种句子，因为预训练不光做LM还要做以两个句子为输入的分类任务
+ Position Embeddings和之前文章中的Transformer不一样，不是三角函数而是学习出来的
+2.2 Pre-training Task 1#: Masked LM
+ 在训练过程中作者随机mask 15%的token，而不是把像cbow一样把每个词都预测一遍。最终的损失函数只计算被mask掉那个token。
+ Masked LM预训练阶段模型是不知道真正被mask的是哪个词，所以模型每个词都要关注。
+2.3 Pre-training Task 2#: Next Sentence Prediction
+ 目的是让模型理解两个句子之间的联系。
+特意说了语料的选取很关键，要选用document-level的而不是sentence-level的，这样可以具备抽象连续长序列特征的能力。
+3.Fine-tunning
+ 
+
   
   
   
