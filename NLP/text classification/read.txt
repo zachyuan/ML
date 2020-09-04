@@ -1,0 +1,2 @@
+bert预训练：
+https://www.cnblogs.com/jiangxinyang/p/10241243.html
