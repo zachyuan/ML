@@ -1,0 +1,156 @@
+介绍
+  现在比较火得Bert是基于Transformer。它使用Self-Attention 机制，不采用 RNN 的顺序结构，使得模型可以并行化训练，而且能够拥有全局信息。
+  
+1.Transformer 结构
+  首先是Transformer 的整体结构。Transformer由Encoder和Decoder两个部分组成，Encoder和Decoder都包含6个block。
+  第一步:获取输入句子的每一个单词的表示向量 X，X由单词的 Embedding 和单词位置的 Embedding 相加得到。
+  第二步:将得到的单词表示向量矩阵 (如上图所示，每一行是一个单词的表示 x) 传入 Encoder 中，经过 6 个 Encoder block 后可以得到句子所有单词的编码信息矩阵 C，
+        单词向量矩阵用 X(n×d)表示， n 是句子中单词个数，d 是表示向量的维度 (论文中 d=512)。每一个 Encoder block 输出的矩阵维度与输入完全一致。
+  第三步:将 Encoder 输出的编码信息矩阵 C传递到 Decoder 中，Decoder 依次会根据当前翻译过的单词 1~ i 翻译下一个单词 i+1。
+        在使用的过程中，翻译到单词 i+1 的时候需要通过 Mask (掩盖) 操作遮盖住 i+1 之后的单词。
+        Decoder 接收了 Encoder 的编码矩阵 C，然后首先输入一个翻译开始符 "<Begin>"，预测第一个单词 "I"；然后输入翻译开始符 "<Begin>" 和单词 "I"，预测单词 "have"，以此类推。
+
+2.Transformer 的输入
+  Transformer 中单词的输入表示 x由单词 Embedding 和位置 Embedding 相加得到。
+  2.1 单词 Embedding
+  单词的 Embedding 有很多种方式可以获取，例如可以采用 Word2Vec、Glove 等算法预训练得到，也可以在 Transformer 中训练得到。
+  2.2 位置 Embedding
+  Transformer 中除了单词的 Embedding，还需要使用位置 Embedding 表示单词出现在句子中的位置。因为 Transformer 不采用 RNN 的结构，
+  而是使用全局信息，不能利用单词的顺序信息，而这部分信息对于 NLP 来说非常重要。所以 Transformer 中使用位置 Embedding 保存单词在序列中的相对或绝对位置。
+  
+  位置 Embedding 用 PE表示，PE 的维度与单词 Embedding 是一样的。PE 可以通过训练得到，也可以使用某种公式计算得到。在 Transformer 中采用了后者
+  好处：
+      :使 PE 能够适应比训练集里面所有句子更长的句子，假设训练集里面最长的句子是有 20 个单词，突然来了一个长度为 21 的句子，则使用公式计算的方法可以计算出第 21 位的 Embedding。
+      :可以让模型容易地计算出相对位置，对于固定长度的间距 k，PE(pos+k) 可以用 PE(pos) 计算得到。因为 Sin(A+B) = Sin(A)Cos(B) + Cos(A)Sin(B), Cos(A+B) = Cos(A)Cos(B) - Sin(A)Sin(B)。
+  
+  将单词的词 Embedding 和位置 Embedding 相加，就可以得到单词的表示向量 x，x 就是 Transformer 的输入。
+
+3.Self-Attention
+  Multi-Head Attention:是由多个 Self-Attention组成的，可以看到 Encoder block 包含一个 Multi-Head Attention。
+                       而 Decoder block 包含两个 Multi-Head Attention (其中有一个用到 Masked)。
+  Multi-Head Attention 上方还包括一个 Add & Norm 层，Add 表示残差连接 (Residual Connection) 用于防止网络退化，
+                                                    Norm 表示 Layer Normalization，用于对每一层的激活值进行归一化。
+  3.1 Self-Attention 结构
+  在计算的时候需要用到矩阵 Q(查询), K(键值), V(值)。在实际中，Self-Attention 接收的是输入(单词的表示向量 x组成的矩阵 X) 或者上一个 Encoder block 的输出。
+  而 Q, K, V 正是通过 Self-Attention 的输入进行线性变换得到的。
+  3.2 Q, K, V 的计算
+  Self-Attention 的输入用矩阵 X进行表示，则可以使用线性变阵矩阵 WQ, WK, WV 计算得到 Q, K, V。注意 X, Q, K, V 的每一行都表示一个单词。
+  3.3 Self-Attention 的输出
+  得到矩阵 Q, K, V之后就可以计算出 Self-Attention 的输出了。
+  计算矩阵 Q和 K 每一行向量的内积，为了防止内积过大，因此除以 dk 的平方根。Q 乘以 K 的转置后，得到的矩阵行列数都为 n，n 为句子单词数，这个矩阵可以表示单词之间的 attention 强度。
+  得到 QKT 之后，使用 Softmax 计算每一个单词对于其他单词的 attention 系数， Softmax 是对矩阵的每一行进行 Softmax，即每一行的和都变为 1。
+  得到 Softmax 矩阵之后可以和 V相乘，得到最终的输出 Z。
+  Softmax 矩阵的第 1 行表示单词 1 与其他所有单词的 attention 系数，最终单词 1 的输出 Z1 等于所有单词 i 的值 Vi 根据 attention 系数的比例加在一起得到。
+  3.4 Multi-Head Attention
+  Multi-Head Attention 是由多个 Self-Attention 组合形成的。
+  首先将输入 X分别传递到 h 个不同的 Self-Attention 中，计算得到 h 个输出矩阵 Z。
+  Multi-Head Attention 将它们拼接在一起 (Concat)，然后传入一个 Linear层，得到 Multi-Head Attention 最终的输出 Z。
+  Multi-Head Attention 输出的矩阵 Z与其输入的矩阵 X 的维度是一样的。
+ 
+ 4. Encoder 结构
+   由 Multi-Head Attention, Add & Norm, Feed Forward, Add & Norm 组成的。
+   4.1 Add & Norm
+   Add & Norm 层由 Add 和 Norm 两部分组成。Add是一种残差连接，通常用于解决多层网络训练的问题，可以让网络只关注当前差异的部分
+                                         Norm指 Layer Normalization，通常用于 RNN 结构，Layer Normalization 会将每一层神经元的输入都转成均值方差都一样的，这样可以加快收敛。
+   4.2 Feed Forward
+   Feed Forward 层比较简单，是一个两层的全连接层，第一层的激活函数为 Relu，第二层不使用激活函数。
+   X是输入，Feed Forward 最终得到的输出矩阵的维度与 X 一致。
+   4.3 组成 Encoder
+   上面描述的 Multi-Head Attention, Feed Forward, Add & Norm 就可以构造出一个 Encoder block，Encoder block 接收输入矩阵 X(n×d)，并输出一个矩阵 O(n×d)。
+   通过多个 Encoder block 叠加就可以组成 Encoder。
+   第一个 Encoder block 的输入为句子单词的表示向量矩阵，后续 Encoder block 的输入是前一个 Encoder block 的输出，最后一个 Encoder block 输出的矩阵就是 编码信息矩阵 C，这一矩阵后续会用到 Decoder 中。
+
+5. Decoder 结构
+  Transformer 的 Decoder block 结构，与 Encoder block 相似。
+  存在一些区别：
+             包含两个 Multi-Head Attention 层。
+             第一个 Multi-Head Attention 层采用了 Masked 操作。
+             第二个 Multi-Head Attention 层的 K, V 矩阵使用 Encoder 的编码信息矩阵 C 进行计算，而 Q 使用上一个 Decoder block 的输出计算。
+             最后有一个 Softmax 层计算下一个翻译单词的概率。       
+   5.1 第一个 Multi-Head Attention
+   Decoder block 的第一个 Multi-Head Attention 采用了 Masked 操作，因为在翻译的过程中是顺序翻译的，即翻译完第 i 个单词，才可以翻译第 i+1 个单词。
+   通过 Masked 操作可以防止第 i 个单词知道 i+1 个单词之后的信息。
+   在 Decoder 的时候，是需要根据之前的翻译，求解当前最有可能的翻译。
+   Decoder 可以在训练的过程中使用 Teacher Forcing 并且并行化训练，即将正确的单词序列 (<Begin> I have a cat) 和对应输出 (I have a cat <end>) 传递到 Decoder。
+   那么在预测第 i 个输出时，就要将第 i+1 之后的单词掩盖住，Mask 操作是在 Self-Attention 的 Softmax 之前使用的。
+   
+   用 0 1 2 3 4 5 分别表示 "<Begin> I have a cat <end>"举例。
+   第一步：
+         是 Decoder 的输入矩阵和 Mask 矩阵，输入矩阵包含 "<Begin> I have a cat" (0, 1, 2, 3, 4) 五个单词的表示向量，Mask 是一个 5×5 的矩阵。
+         在 Mask 可以发现单词 0 只能使用单词 0 的信息，而单词 1 可以使用单词 0, 1 的信息，即只能使用之前的信息。
+   第二步：
+         接下来的操作和之前的 Self-Attention 一样，通过输入矩阵 X计算得到 Q, K, V 矩阵。然后计算 Q 和 KT 的乘积 QKT。
+   第三步：
+         在得到 QKT 之后需要进行 Softmax，计算 attention score，我们在 Softmax 之前需要使用 Mask矩阵遮挡住每一个单词之后的信息。
+         得到 Mask QKT 之后在 Mask QKT 上进行 Softmax，每一行的和都为 1。但是单词 0 在单词 1, 2, 3, 4 上的 attention score 都为 0。
+   第四步：
+         使用 Mask QKT 与矩阵 V相乘，得到输出 Z。
+   第五步：
+         通过上述步骤就可以得到一个 Mask Self-Attention 的输出矩阵 Zi，然后和 Encoder 类似，
+         通过 Multi-Head Attention 拼接多个输出 Zi 然后计算得到第一个 Multi-Head Attention 的输出 Z，Z与输入 X 维度一样。   
+   5.2 第二个 Multi-Head Attention
+   Decoder block 第二个 Multi-Head Attention 变化不大， 
+   主要的区别在于其中 Self-Attention 的 K, V矩阵不是使用 上一个 Decoder block 的输出计算的，而是使用 Encoder 的编码信息矩阵 C 计算的。
+   根据 Encoder 的输出 C计算得到 K, V，根据上一个 Decoder block 的输出 Z 计算 Q (如果是第一个 Decoder block 则使用输入矩阵 X 进行计算)，后续的计算方法与之前描述的一致。
+   这样做的好处是在 Decoder 的时候，每一位单词都可以利用到 Encoder 所有单词的信息 (这些信息无需 Mask)。
+   5.3 Softmax 预测输出单词
+   Decoder block 最后的部分是利用 Softmax 预测下一个单词，在之前的网络层我们可以得到一个最终的输出 Z，因为 Mask 的存在，使得单词 0 的输出 Z0 只包含单词 0 的信息。
+   Softmax 根据输出矩阵的每一行预测下一个单词。
+   这就是 Decoder block 的定义，与 Encoder 一样，Decoder 是由多个 Decoder block 组合而成。
+   
+6. Transformer 总结
+   Transformer 与 RNN 不同，可以比较好地并行训练。
+   Transformer 本身是不能利用单词的顺序信息的，因此需要在输入中添加位置 Embedding，否则 Transformer 就是一个词袋模型了。
+   Transformer 的重点是 Self-Attention 结构，其中用到的 Q, K, V矩阵通过输出进行线性变换得到。
+   Transformer 中 Multi-Head Attention 中有多个 Self-Attention，可以捕获单词之间多种维度上的相关系数 attention score。
+   
+   
+   
+   
+   
+             
+             
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+
+ 
+
+   
+   
+  
+  
+ 
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+ 
