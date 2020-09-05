@@ -1,3 +1,9 @@
+transformer 
+https://baijiahao.baidu.com/s?id=1651219987457222196&wfr=spider&for=pc 
+
+xgboostinterview 
+https://zhuanlan.zhihu.com/p/42740654
+
 bert
 https://blog.csdn.net/yangdelong/article/details/85070608
 https://zhuanlan.zhihu.com/p/46652512
