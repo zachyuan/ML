@@ -1,0 +1,201 @@
+1.循环神经网络
+  1.1
+  TensorFlow中实现LSTM结构的循环神经网络的前向传播过程
+    BasicLSTMCell类提供了zero_state函数来生成全零状态。
+    state是一个包含两个张量的LSTMStateTuple类，其中state.c和state.h分别对应c状态和h状态。
+    和其他神经网络类似，在优化循环神经网络时，每次也会使用一个batch的训练样本。
+  1.2 循环神经网络的变种
+  在经典的循环神经网络中，状态的传输是从前往后单向的。然而，有些问题中当前时刻的输出不仅和之前的状态有关系，也和之后的状态有关系，这是就需要使用双向循环神经网络来解决这类问题。
+  如：预测一个语句中缺失的单词不仅需要根据前文来判断，也需要根据后文来判断。 
+      双向循环神经网络时由两个独立的循环神经网络叠加在一起组成，输出由两个循环神经网络的输出拼接而成。
+      每一层网络中的循环体可以自由选用任意结构，如RNN、LSTM。
+  1.3 深层循环神经网络
+  为了增强模型的表达能力，可以在网络中设置多个循环层，将每层循环网络的输出传给下一层进行处理。
+      TensorFlow提供了MultiRNNCell类来实现深层循环神经网络的前向传播过程
+      只需要在BasicLSTMCell的基础上再封装一层MultiRNNCell就可以非常容易地实现深层循环神经网络
+  1.4 循环神经网络的dropout
+  通过dropout，可以让卷积神经网络更加健壮，类似，在循环神经网络中使用dropout也有同样的功能。
+  循环神经网络一般只在不同层循环体结构中使用dropout，而不在同一层的循环体结构之间使用（不同时刻之间不使用）
+  TensorFlow中使用tf.nn.rnn_cell.DropoutWrapper类可以很容易实现dropout功能
+  1.5 循环神经网络样例应用
+  利用循环神经网络实现函数sinx取值的预测
+2.自然语言处理
+  利用循环神经网络来搭建自然语言处理方面的一些经典应用，如语言模型、机器翻译等。
+  2.1 语言模型的背景知识
+  语言模型：假设一门语言中所有可能的句子服从某一个概率分布，每个句子出现的概率加起来为1，那么语言模型的任务就是预测每个句子在语言中出现的概率。
+    :对于语言中常见的句子，一个好的语言模型应得出相对较高的概率；而对于不合语法的句子，计算出的概率则应接近零。
+    :语言模型仅仅对句子出现的概率进行建模，并不尝试去理解句子的内容含义。
+    :神经网络机器翻译的Seq2Seq模型可以看作是一个条件语言模型（Conditional Language Model），它相当于在给定输入的情况下对目标语言的所有句子估算概率，并选座其中概率最大的句子作为输出。
+    :常见的方法有：n-gram模型、决策树、最大熵模型、条件随机场、神经网络语言模型等。
+  语言模型的评价方法：语言模型效果好坏的常用评价指标是复杂度（perplexity）。在测试集上perplexity越低，效果越好。
+    :perplexity值刻画的是语言模型预测一个语言样本的能力。比如已经知道(w1,w2,...wm)这句话会出现在语料库中，那么通过语言模型计算得到这句子的概率越高，说明语言模型对这个语料库拟合得越好。
+    :perplexity实际是计算每一个单词得到的概率倒数的几何平均，因此perplexity可以理解为平均分支系数，即模型预测下一个词时的平均可选择数量。
+    :目前在PTB(Penn Tree Bank)数据集上最好的语言模型perplexity为47.7，即在平均情况下，该模型预测下一个词时，有47.7个词等可能地作为下一个词的合理选择。
+    :在神经网络模型中，p(wi|w1,w2,...wi-1)分布通常是由一个softmax层产生的，这时TensorFlow中提供了两个方便计算交叉熵的函数
+      tf.nn.softmax_cross_entropy_with_logits
+      tf.nn.sparse_softmax_cross_entropy_with_logits
+      区别:
+          由于softmax_cross_entropy_with_logits允许提供一个概率分布，因此在使用时有更大的自由度。
+          举个例子：一种叫label smoothing的技巧是将正确数据的概率设为一个比1.0略小的值，将错误数据的概率设为比0.0略大的值，这样可以避免模型与数据过拟合，在某些时候可以提高训练效果。
+  2.2 神经语言模型
+    每个时刻的输入为句子中的单词wi，而每个时刻的输出为一个概率分布，表示句子中下一个位置为不同单词的概率p(wi+1|w1,w2,...wi)
+    每个单词输入时先会被转换成Enbedding向量（实数向量）
+    2.2.1 PTB数据集的预处理
+    PTB（Penn Treebank Dataset）文本数据集是目前语言模型学习中使用广泛的数据集。
+    下载源自Tomas Mikolov网站的PTB数据：http://www.fit.vutbr.cz/~imikolov/rnnlm/simple-examples.tgz
+      此处只关系data文件夹下的三个文件：ptb.test.txt, ptb.train.txt, ptb.valid.txt。
+      这三个文件已经预处理，相邻单词之间用空格隔开。
+      数据集中包含了9998个不同的单词词汇，加上稀有词语的特殊符号和语句结束标记符，一共10000个词汇。
+    为了将稳步转化为模型可以读入的单词序列，需要将这10000个单词分别映射到0~9999之间的整数编号；.py
+    在确定词汇表之后，再将训练文件、测试文件等都根据词汇表文件转化为单词编号
+    在实际工程中，通常使用TFRecords格式来提高读写效率。虽然预处理原则上可以放在TensorFlow的Dataset框架中与读取文本同时进行
+    2.2.2PTB数据的batching方法
+    文本数据的每个句子长度不同，又无法像图像一样调整到固定维度，因此在对文本数据进行batching时需要采取一些特殊的操作。
+      常见的办法:
+        办法一：使用填充（padding）将同一个batch内的句子长度补齐。
+        办法二：语言模型为了利用上下文信息，必须将前面句子的信息传递到后面的句子，为了实现这个目标，在PTB上下文有关联的数据集中，通常采用另一种batching方法。
+      若将整个文档放入计算图，这会导致计算图过大，另外序列过长可能造成训练中梯度爆炸的问题。
+        解决方法：将长序列切割为固定长度的子序列。
+        循环神经网络在处理完一个子序列后，它最终的隐藏状态将复制到下一个序列中作为初始值，这样在前向计算时，效果等同于一次性顺序地读取了整个文档
+        在反向传播时，梯度则只在每个子序列内部传播
+    batching例子
+      假如输入句子是[ 1 2 3 4 5 6 7 8 9 10 11 12]，并设置batchsize为4，numstep为2。
+      先把输入句子按batch_size分为多个batch
+      [[ 1 2 3 4]
+      [ 5 6 7 8]
+      [ 9 10 11 12]]
+      再从纵轴方向由上往下把上面划分batch后的二维数据在切分为num_step份
+      array([[ 1, 2], [ 5, 6],
+      [ 9, 10]])
+
+      array([[ 3, 4],
+      [ 7, 8],
+      [11, 12]])
+    2.2.3基于循环神经网络的神经语言模型
+      与循环神经网络相比，NLP应用主要多了两层：词向量层（embedding）和softmax（层）。
+      词向量
+        在输入层，每一个单词用一个实数向量表示，这个向量被称为”词向量“/"词嵌入"，词向量作用：
+          降低输入的维度
+          增加语义信息
+        假设词向量的维度时EMB_SIZE，词汇表的大小为VOCAB_SIZE，那么所有单词的词向量可以放入一个大小为VOCAB_SIZE*EMB_SIZE的矩阵内。
+        在读取词向量时，可以调用tf.nn.embedding_lookup方法
+        embedding = tf.get_variable('embedding', [VOCAB_SIZE, EMB_SIZE])
+        # 输出的矩阵比输入数据多一个维度，新增维度的大小是EMB_SIZE。在语言模型中，一般input_data的维度时batch_size*num_steps，而输出的input_embedding维度时batch_size*num_steps*EMB_SIZE.
+        input_embedding = tf.nn.embedding_lookup(embedding, input_data)
+      Softmax层
+      作用是将循环神经网络的输出转化为一个单词表中每个单词的输出概率，两个步骤：
+      使用一个线性映射将循环神经网络的输出映射为一个维度与词汇表大小相同的向量，这一步的输出叫作logits
+      调用softmax方法将logits转化为加和未1的概率
+      # 定义线性映射用到的参数。
+        # HIDDEN_SIZE是循环神经网络的隐藏状态维度，VOCAB_SIZE是词汇表的大小。
+        weight = tf.get_variable('weight', [HIDDENT_SIZE, VOCAB_SIZE])
+        bias = tf.get_variable('bias', [VOCAB_SIZE])
+        # 计算线性映射
+        # output是RNN的输出，其维度为[batch_size*num_steps, HIDDENT_SIZE]
+        logits = tf.nn.bias_add(tf.matmul(output, weight), bias)
+
+        # prob的维度与logits的维度相同
+        probs = tf.nn.softmax(logits)
+      模型训练通常不关心概率的具体取值，而更关心最终的log perplexity，因此可以调用tf.nn.sparse_softmax_cross_entropy_with_logits方法直接从logits计算log perplexity作为损失函数。
+      # 单词编号
+        # logits的维度时[batch_size*num_steps, HIDDEN_SIZE]
+        # loss的维度与label相同，代表每个位置上的log perplexity
+        loss = tf.nn.sparse_softmax_cross_entropy_with_logits(
+            labels=tf.reshape(self.targets, [-1]), logits=logits
+        )
+    2.2.4 通过共享参数减少参数数量
+      softmax层和词向量的参数数量都与词汇表大小VOCAB_SIZE成正比，softmax和embedding在整个网络的参数数量中占有很大的比例。
+      词向量和softmax层的参数数量是相等的，如果共享词向量层和softmax层的参数，不仅能大幅度减少参数数量，还能提高最终模型效果。
+   2.2.5 完整的训练程序：一个双层LSTM作为循环神经网络的主体，并共享softmax层和词向量层的参数 lstm_complete.py
+ 3. 神经网络机器翻译
+   Seq2Seq模型的基本思想非常简单，使用一个循环神经网络读取输入句子，将整个句子的信息压缩到一个固定维度的编码中；再使用另一个循环神经网络读取这个编码，将其“解压”为目标语言的一个句子。
+   解码器的结构和语言模型几乎相同：输入为单词的词向量，输出为softmax层产生的单词概率，损失函数为log perplexity。
+   编码阶段并未输出，因此编码器不需要softmax层。
+   共享softmax层和词向量的参数，都可以直接应用到Seq2Seq模型的解码器中。
+   训练过程中，编码器顺序读入每个单词的词向量，然后将最终的隐藏状态复制到解码器作为初始状态。
+     解码器的第一个输入是一个特殊的<sos>（start-of-sentence）字符，每一步预测的单词是训练数据的目标句子，预测序列的最后一个单词是与语言模型相同的<eos>（End-Of-Sentence）字符。
+   语言模型中测试的标准是给定目标句子上的perplexity，而机器翻译的测试方法是让解码器在没有“正确答案”的情况下自主生成一个翻译句子，然后采用人工或自动的方法对翻译句子的质量进行评测。
+   3.1机器翻译文本数据预处理
+     机器翻译领域最重要的公开数据集是WMT数据集
+     首先需要统计语料中出现的单词，为每个单词分配一个ID，将词汇表存入一个vocab文件，然后将文件转换为用单词编号的形式来表示。
+     在机器翻译的训练样本中，每个句子对通常是作为独立的数据来训练的。
+     由于每个句子的长短不一致，因此在将这些句子放入同一个batch时，需要将较短的句子补齐到与同batch内最长句子相同的长度。tf.data.Dataset的padded_batch()提供了填充功能
+     循环神经网络在读取数据时会将填充位置的内容与其他内容一样纳入计算，为了不让填充数据影响训练，注意内容：
+       循环神经网络在读取填充时，应当跳过这一位置的计算。
+        TensorFlow提供了tf.nn.dynamic_rnn方法来实现这功能
+        dynamic_rnn输入数据的内容（维度为[batch_size, time]）和输入数据的长度（维度为[time]）。
+        对于输入batch里的每一条数据，在读取了相应长度的内容后，dynamic_rnn就跳过后面的输入，直接把前一步的计算结果复制到后面的时刻。相当于忽略padding内容。
+     在设计损失函数时需要特别将填充位置的损失的权重设置为0，这样在填充位置产生的预测不会影响梯度的计算。
+     使用tf.data.Dataset.padded_batch来进行填充和batching，并记录每个句子的序列长度以用作dynamic_rnn的输入。dynamic_rnn.py
+   3.2 Seq2Seq模型实现
+   与语言模型相比，主要变化有以下几点：
+      增加一个循环神经网络作为编码器
+      使用Dataset动态读取数据，而不是直接将所有数据读入内容
+      每个batch完全独立，不需要在batch之间传递状态
+      每训练200步便将参数保存到一个checkpoint中
+   3.3 训练代码 seqseq_train.py
+     因为训练时解码器可以从输入中读取完整的目标训练句子，因此可以用dynamic_rcc简单地展开成前馈网络。
+   3.4 测试代码 seqseq_test.py
+     在解码过程中，模型只能看到输入句子，却不能看到目标句子。解码器在第一步读取<sos>符，预测目标句子的第一个单词，然后需要将这个预测的单词复制到第二步作为输入，再预测第二个单词，直到预测的单词为<eos>为止。
+     这个过程需要使用一个循环结构来实现，在TensorFlow中，循环结构是由tf.while_loop来实现
+     tf.while_loop使用
+       cond是一个函数，负责判断继续执行循环的条件
+       loop_body是每个循环体内执行的操作，负责对循环状态更新
+       init_state为循环的起始状态，它可以包含多个Tensor或者TensorArray
+       返回的结果是循环结束时的循环状态
+       final_state = tf.while_loop(cood, loop_body, init_state)
+    3.3 注意力模型
+      在Seq2Seq模型中，编码器将完整的输入句子压缩到一个维度固定的向量中，然后解码器根据这个向量生成输出句子。
+      当输入句子较长时，这个中间向量难以存储足够的信息，就成为这个模型的一个瓶颈。
+      注意力（Attention）机制就是为了解决这个问题而设计的。注意力机制允许解码器随时查阅输入句子中的部分单词或片段，因此不再需要在中间向量中存储所有信息。
+      解码器在解码的每一步将隐藏状态作为查询的输入来”查询“编码器的隐藏状态，在每个输入的位置计算一个反映与查询输入相关程度的权重，再根据这个权重对各输入位置的隐藏状态求加权平均。
+      加权平均后得到的向量称为”context“，表示它是与翻译当前单词最相关的原文信息。
+      在解码下一个单词时，将context作为额外信息输入到循环神经网络中，这样循环神经网络可以时刻读取原文中最相关的信息，而不必完全依赖于上一时刻的隐藏状态。
+      通过context向量，解码器可以在解码的每一步查询最相关的原文信息，从而避免Seq2Seq模型中信息瓶颈问题。
+      注意力模型与Seq2Seq的不同:
+        增加了注意力机制
+        编码器采用了双向循环网络，因为在解码器通过注意力查询一个单词时，通常也需要知道单词周围的部分信息。
+        取消了编码器与解码器之间的连接，解码器完全依赖于注意力机制获取原文信息。
+        使得编码器和解码器可以独立自由选择模型，可以选择不同层数、不同维度、不同结构的循环神经网络
+      TensorFlow提供了几种预置的实现，tf.contrib.seq2seq.AttentionWrapper将编码器的神经网络层和注意力层结合，成为一个更高层的循环神经网络。
+      # 下面的self.enc_cell_fw和self.enc_cell_bw定义了编码器中的前向和后向循环网络，
+      # 下面的self.enc_cell_fw和self.enc_cell_bw定义了编码器中的前向和后向循环网络，
+      -------
+          # 下面的self.enc_cell_fw和self.enc_cell_bw定义了编码器中的前向和后向循环网络，
+          # 它取代了Seq2Seq样例中__init__里的self.enc_cell。
+          self.enc_cell_fw = tf.nn.rcc_cell.BasicLSTMCell(HIDDENT_SIZE)
+          self.enc_cell_bw = tf.nn.rcc_cell.BasicLSTMCell(HIDDENT_SIZE)
+
+          # 下面的代码取代了Seq2Seq样例中forward函数的相应部分
+          with tf.variable_scope('encoder'):
+              # 构造编码器时，使用bidirectional_dynamic_cnn构造双向循环网络。
+              # 双向循环网络的顶层输出enc_outputs是一个包含两个张量的tuple，
+              # 每个张量的维度都是[batch_size, max_time, HIDDEN_SIZE]，
+              # 代表两个LSTM在每一步的输出。
+              enc_outputs, enc_state = tf.nn.bidirectional_dynamic_rnn(
+              self.enc_cell_fw, self.enc_cell_bw, src_emb, src_size, 
+              dtype=tf.float32)
+              # 将两个LSTM的输出拼接为一个张量。
+              enc_outputs = tf.concat([enc_outputs[0], enc_outputs[1]], -1)     
+
+          with tf.variable_scope("decoder"):
+              # 选择注意力权重的计算模型。BahdanauAttention是使用一个隐藏层的前馈神经网络。
+              # memory_sequence_length是一个维度为[batch_size]的张量，代表batch
+              # 中每个句子的长度，Attention需要根据这个信息把填充位置的注意力权重设置为0。
+              attention_mechanism = tf.contrib.seq2seq.BahdanauAttention(
+                  HIDDEN_SIZE, enc_outputs,
+                  memory_sequence_length=src_size)
+
+              # 将解码器的循环神经网络self.dec_cell和注意力一起封装成更高层的循环神经网络。
+              attention_cell = tf.contrib.seq2seq.AttentionWrapper(
+                  self.dec_cell, attention_mechanism,
+                  attention_layer_size=HIDDEN_SIZE)
+
+              # 使用attention_cell和dynamic_rnn构造编码器。
+              # 这里没有指定init_state，也就是没有使用编码器的输出来初始化输入，而完全依赖
+              # 注意力作为信息来源。
+              dec_outputs, _ = tf.nn.dynamic_rnn(
+                  attention_cell, trg_emb, trg_size, dtype=tf.float32)
+      --------
+      一方面注意力机制使得编码器可以在每一步主动查询最相关的信息，而暂时忽略不相关的信息；
+      另一方面，它大大缩短了信息流动的距离，解码器在任意时刻只需一步就可以查阅输入的任意单词。
