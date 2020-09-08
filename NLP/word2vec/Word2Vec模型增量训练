@@ -1,0 +1,28 @@
+1.Word2Vec模型增量训练
+word2vec的本质是一个神经网络语言模型，基于语言模型进行分布式词向量的训练。它需要大量的语料进行训练，从而找到词与词之间的关系，但是当我们已经训练好了一个word2vec模型之后，数据库中又新流动进来了很多语料，
+我们应该在怎么办呢？我们不可能又基于所有语料重新训练一遍（当语料过大时，太耗费时间了），这时候，增量训练就派上了用场。
+word2vec_incre.py
+2.gensim word2vec API概述
+    2.1训练模型
+    在gensim中，word2vec 相关的API都在包gensim.models.word2vec中。进行word2vec模型训练的函数以及常用参数解释如下：
+    from gensim.models.word2vec import Word2Vec
+    model = Word2Vec(text, size, min_count, window, sg)
+      text: 分词处理之后的语料
+      size: 词向量的维度，默认值是100
+      min_count: 需要计算词向量的最小词频。这个值可以去掉一些很生僻的低频词，默认是5。
+      window: 滑动窗口大小，默认为5。
+      sg: 即我们的word2vec两个模型的选择了。如果是0， 则是CBOW模型，是1则是Skip-Gram模型，默认是0即CBOW模型。
+    2.2保存模型
+      youmodelname.save('yourpath/word2vec.model')    
+    2.3加载模型
+      model = gensim.models.Word2Vec.load(r'youpath/word2vec.model')
+    2.4计算两个词的相似度
+      yourmodel.similarity('word1', 'word2')
+    2.5找到相似度最高的词
+      yourmodel.most_similar('word', topn=10)
+      # topn: 返回最相似的词的个数，默认为10
+    2.6在一些词中找到最不相关的词
+      yourmodel.doesbt_match(['word1', 'word2', 'word3', 'word4'])
+    2.7输出某个词的词向量
+      yourmodel['word']
+3.
