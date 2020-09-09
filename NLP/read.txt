@@ -8,3 +8,7 @@ bert
 https://blog.csdn.net/yangdelong/article/details/85070608
 https://zhuanlan.zhihu.com/p/46652512
 https://blog.csdn.net/zhuchengzhang/article/details/89010666
+
+xlnet
+https://blog.csdn.net/u012526436/article/details/93196139
+
